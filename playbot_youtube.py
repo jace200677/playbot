@@ -13,7 +13,7 @@ YOUTUBE_STREAM_URL = "rtmp://a.rtmp.youtube.com/live2"
 YOUTUBE_STREAM_KEY = "8z2g-s4ar-t1p8-9ab3-f90f"  # Replace with your key
 
 # ---------------- TTS ----------------
-engine = pyttsx3.init()
+engine = pyttsx3.init('sapi5')
 engine.setProperty("rate", 160)
 engine.setProperty("volume", 1.0)
 
