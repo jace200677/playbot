@@ -10,7 +10,7 @@ import subprocess
 
 # ---------------- YouTube Stream Settings ----------------
 YOUTUBE_STREAM_URL = "rtmp://a.rtmp.youtube.com/live2"
-YOUTUBE_STREAM_KEY = "YOUR_STREAM_KEY"  # Replace with your key
+YOUTUBE_STREAM_KEY = "p9yk-71aq-0tpx-ga26-623d"  # Replace with your key
 
 # ---------------- TTS ----------------
 engine = pyttsx3.init()
