@@ -22,8 +22,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        pip install -r requirements.txt
-        pip install opencv-python
+        pip install pyttsx3 requests numpy Pillow opencv-python ffmpeg-python
 
     - name: Run PlayBot (map/alerts only)
       run: python playbot_youtube.py
