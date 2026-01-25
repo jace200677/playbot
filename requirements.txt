@@ -1,5 +1,8 @@
-pyttsx3
-opencv-python
-numpy
-Pillow
-ffmpeg-python
+import pyttsx3
+import numpy as np
+import cv2
+import ffmpeg
+Image
+ImageDraw
+ImageFont
+subprocess
