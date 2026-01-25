@@ -20,4 +20,4 @@ jobs:
           pip install requests
       - name: Run weather alert
         run: |
-          python weather.py
+          python playbot_youtube.py
