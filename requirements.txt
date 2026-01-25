@@ -1,0 +1,5 @@
+pyttsx3
+opencv-python
+numpy
+Pillow
+ffmpeg-python
