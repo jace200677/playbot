@@ -9,7 +9,7 @@ import matplotlib.path as mplPath
 
 # ---- STREAM SETTINGS ----
 RTMP = "rtmp://a.rtmp.youtube.com/live2"
-KEY = os.environ["YOUTUBE_STREAM_KEY"]  # set this in environment
+KEY = "8z2g-s4ar-t1p8-9ab3-f90f"  # set this in environment
 WIDTH, HEIGHT = 1280, 720
 FPS = 5
 
