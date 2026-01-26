@@ -30,6 +30,8 @@ jobs:
         pip install requests numpy pillow ffmpeg-python
         pip install opencv-python
         pip install shapely
+        python3 -m pip install matplotlib
+
 
     - name: Run PlayBot Stream
       env:
