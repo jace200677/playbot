@@ -1,82 +1,137 @@
-import requests
+import os
 import time
+import requests
 import numpy as np
+import subprocess
 from PIL import Image, ImageDraw, ImageFont
-import ffmpeg
 
-# ---------------- YouTube RTMP ----------------
+# ==============================
+# YouTube RTMP
+# ==============================
 YOUTUBE_URL = "rtmp://a.rtmp.youtube.com/live2"
-STREAM_KEY = "8z2g-s4ar-t1p8-9ab3-f90f"  # Replace with your actual key
+STREAM_KEY = os.environ.get("YOUTUBE_STREAM_KEY")
 
-# ---------------- FFmpeg settings ----------------
+if not STREAM_KEY:
+    raise RuntimeError("Missing YOUTUBE_STREAM_KEY environment variable")
+
+# ==============================
+# Video Settings
+# ==============================
 WIDTH = 1280
 HEIGHT = 720
-FRAMERATE = 5  # 5 fps for smooth live video
-UPDATE_INTERVAL = 1 / FRAMERATE  # seconds
+FPS = 5
+FRAME_TIME = 1 / FPS
 
-# ---------------- NOAA Alerts ----------------
-def fetch_noaa_alerts():
+# ==============================
+# Fonts
+# ==============================
+def load_font(size):
     try:
-        res = requests.get("https://api.weather.gov/alerts/active", timeout=10)
-        data = res.json()
-        alerts = []
-        for feature in data.get("features", []):
-            props = feature["properties"]
-            if props.get("severity") in ["Severe","Extreme"]:
-                alerts.append({
-                    "event": props.get("event"),
-                    "areas": props.get("areaDesc"),
-                    "effective": props.get("effective"),
-                })
-        return alerts
+        return ImageFont.truetype("DejaVuSans-Bold.ttf", size)
     except:
-        return []
+        return ImageFont.load_default()
 
-# ---------------- Map Frame with Bottom Text ----------------
-def create_frame(alerts):
-    # Black background
-    img = np.zeros((HEIGHT, WIDTH, 3), dtype=np.uint8)
-    pil = Image.fromarray(img)
-    draw = ImageDraw.Draw(pil)
-    font = ImageFont.load_default()
+FONT_TITLE = load_font(32)
+FONT_TEXT = load_font(18)
 
-    # Draw a semi-transparent bottom box
-    box_height = 120
-    draw.rectangle([0, HEIGHT - box_height, WIDTH, HEIGHT], fill=(30,30,30,200))
+# ==============================
+# NOAA Alerts
+# ==============================
+def fetch_noaa_alerts():
+    alerts = []
+    try:
+        r = requests.get(
+            "https://api.weather.gov/alerts/active",
+            headers={"User-Agent": "PlayBot Weather Stream"},
+            timeout=10
+        )
+        data = r.json()
 
-    # Add alert texts at the bottom
-    y = HEIGHT - box_height + 10
-    for a in alerts[:5]:  # show up to 5 alerts
-        text = f"{a['event']} — {a['areas']}"
-        draw.text((10, y), text, fill=(255,0,0), font=font)
-        y += 20
+        for f in data.get("features", []):
+            p = f["properties"]
+            if p.get("severity") in ("Severe", "Extreme"):
+                alerts.append({
+                    "event": p.get("event", "Alert"),
+                    "areas": p.get("areaDesc", ""),
+                })
 
-    # Title at the top
-    draw.text((10, 10), "PlayBot 24/7 USA Weather Alerts", fill=(255,255,255), font=font)
+    except Exception as e:
+        print("NOAA error:", e)
 
-    return np.array(pil)
+    return alerts[:6]
 
-# ---------------- FFmpeg Stream ----------------
+# ==============================
+# Frame Builder
+# ==============================
+def build_frame(alerts):
+    img = Image.new("RGB", (WIDTH, HEIGHT), (0, 0, 0))
+    d = ImageDraw.Draw(img)
+
+    # Title
+    d.text((20, 15), "PlayBot 24/7 USA Weather Alerts", fill=(255,255,255), font=FONT_TITLE)
+
+    # Bottom bar
+    bar_h = 150
+    d.rectangle((0, HEIGHT-bar_h, WIDTH, HEIGHT), fill=(30,30,30))
+
+    y = HEIGHT - bar_h + 15
+    if alerts:
+        for a in alerts:
+            text = f"⚠ {a['event']} — {a['areas']}"
+            d.text((20, y), text, fill=(255,80,80), font=FONT_TEXT)
+            y += 22
+    else:
+        d.text((20, y), "No Severe or Extreme Alerts", fill=(200,200,200), font=FONT_TEXT)
+
+    return np.array(img)
+
+# ==============================
+# FFmpeg Pipe
+# ==============================
 def start_ffmpeg():
-    process = (
-        ffmpeg
-        .input('pipe:', format='rawvideo', pix_fmt='bgr24', s=f'{WIDTH}x{HEIGHT}', framerate=FRAMERATE)
-        .output(f'{YOUTUBE_URL}/{STREAM_KEY}', format='flv', vcodec='libx264', pix_fmt='yuv420p', r=FRAMERATE)
-        .overwrite_output()
-        .run_async(pipe_stdin=True, pipe_stdout=True, pipe_stderr=True)
-    )
-    return process
+    cmd = [
+        "ffmpeg",
+        "-loglevel", "error",
+        "-f", "rawvideo",
+        "-pix_fmt", "rgb24",
+        "-s", f"{WIDTH}x{HEIGHT}",
+        "-r", str(FPS),
+        "-i", "-",
+        "-c:v", "libx264",
+        "-preset", "veryfast",
+        "-pix_fmt", "yuv420p",
+        "-g", str(FPS * 2),
+        "-f", "flv",
+        f"{YOUTUBE_URL}/{STREAM_KEY}"
+    ]
+    return subprocess.Popen(cmd, stdin=subprocess.PIPE)
 
-# ---------------- Main Loop ----------------
-def run_playbot():
-    print("🤖 PlayBot 24/7 Map + Alerts Live Stream")
-    ffmpeg_proc = start_ffmpeg()
+# ==============================
+# Main Loop
+# ==============================
+def main():
+    print("▶ PlayBot Live Weather Stream STARTED")
+    ffmpeg = start_ffmpeg()
+    last_fetch = 0
+    alerts = []
 
     while True:
-        alerts = fetch_noaa_alerts()
-        frame = create_frame(alerts)
-        ffmpeg_proc.stdin.write(frame.tobytes())
-        time.sleep(UPDATE_INTERVAL)  # keep feed smooth
+        now = time.time()
 
+        if now - last_fetch > 30:
+            alerts = fetch_noaa_alerts()
+            last_fetch = now
+
+        frame = build_frame(alerts)
+
+        try:
+            ffmpeg.stdin.write(frame.tobytes())
+        except BrokenPipeError:
+            print("FFmpeg crashed, restarting...")
+            ffmpeg = start_ffmpeg()
+
+        time.sleep(FRAME_TIME)
+
+# ==============================
 if __name__ == "__main__":
-    run_playbot()
+    main()
