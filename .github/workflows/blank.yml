@@ -1,27 +1,27 @@
-name: PlayBot 24/7 Live Stream
+name: YallBot 24/7 Live Stream
 
 on:
   workflow_dispatch:   # allows manual trigger
   schedule:
-    - cron: "*/15 * * * *"  # optional: run every 15 min (or remove for manual only)
+    - cron: "*/15 * * * *"  # optional: run every 15 minutes (can remove if manual only)
 
 jobs:
-  run-playbot:
+  run-yallbot:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout repo
+      # 1️⃣ Checkout the repository
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2️⃣ Setup Python
-      - name: Setup Python 3.10
+      # 2️⃣ Set up Python
+      - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.10"
 
-      # 3️⃣ Install system dependencies (for FFmpeg and fonts)
-      - name: Install dependencies
+      # 3️⃣ Install system dependencies
+      - name: Install system dependencies
         run: |
           sudo apt update
           sudo apt install -y ffmpeg fonts-dejavu-core
@@ -32,3 +32,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests numpy pillow ffmpeg-python
 
+      # 5️⃣ Set YouTube Stream Key secret
+      - name: Set environment variable
+        run: echo "YOUTUBE_STREAM_KEY=${{ secrets.YOUTUBE_STREAM_KEY }}" >> $GITHUB_ENV
+
+      # 6️⃣ Run Y'allBot
+      - name: Run YallBot
+        run: |
+          python playbot.py
