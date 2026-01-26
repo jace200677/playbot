@@ -21,7 +21,7 @@ jobs:
       run: python -m pip install --upgrade pip
 
     - name: Install system dependencies
-      run: sudo apt update && sudo apt install -y espeak ffmpeg
+      run: sudo apt install ffmpeg
 
     - name: Install Python dependencies
       run: |
