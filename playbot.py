@@ -6,7 +6,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 # ---- STREAM SETTINGS ----
 RTMP = "rtmp://a.rtmp.youtube.com/live2"
-KEY = "8z2g-s4ar-t1p8-9ab3-f90f"  # replace with your actual key
+KEY = "zqzd-50eu-s3fy-0gvz-9b36"  # replace with your actual key
 WIDTH, HEIGHT = 1280, 720
 FPS = 5
 
