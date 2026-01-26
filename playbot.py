@@ -3,13 +3,10 @@ import requests
 import numpy as np
 import ffmpeg
 from PIL import Image, ImageDraw, ImageFont
-import cv2
-from shapely.geometry import shape, Point
-import matplotlib.path as mplPath
 
 # ---- STREAM SETTINGS ----
 RTMP = "rtmp://a.rtmp.youtube.com/live2"
-KEY = "8z2g-s4ar-t1p8-9ab3-f90f"  # set this in environment
+KEY = "8z2g-s4ar-t1p8-9ab3-f90f"  # replace with your actual key
 WIDTH, HEIGHT = 1280, 720
 FPS = 5
 
@@ -58,8 +55,10 @@ def fetch_noaa_alerts():
         return []
 
 # ---- DRAW FRAME ----
-def draw_frame(background_frame, alerts, ticker_x):
-    pil = Image.fromarray(background_frame)
+def draw_frame(alerts, ticker_x):
+    # solid dark background
+    frame = np.zeros((HEIGHT, WIDTH, 3), dtype=np.uint8)
+    pil = Image.fromarray(frame)
     draw = ImageDraw.Draw(pil)
 
     # Title
@@ -88,39 +87,27 @@ def draw_frame(background_frame, alerts, ticker_x):
 
     return np.array(pil), len(crawl)*12
 
-# ---- BACKGROUND (Video or Radar) ----
-def get_base_frame(cap):
-    ret, frame = cap.read()
-    if not ret:
-        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-        ret, frame = cap.read()
-    frame = cv2.resize(frame, (WIDTH,HEIGHT))
-    return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
+# ---- MAIN LOOP ----
 def main():
-    cap = cv2.VideoCapture("background.mp4")  # looped background
     streamer = start_ffmpeg()
     ticker_x = WIDTH
-
     last_alert = 0
     alerts = []
 
     while True:
-        frame_rgb = get_base_frame(cap)
-
-        # update alerts periodically
+        # update alerts every 30s
         if time.time() - last_alert > 30:
             alerts = fetch_noaa_alerts()
             last_alert = time.time()
 
-        out_frame, crawl_width = draw_frame(frame_rgb, alerts, ticker_x)
+        out_frame, crawl_width = draw_frame(alerts, ticker_x)
         ticker_x -= 5
         if ticker_x < -crawl_width:
             ticker_x = WIDTH
 
         try:
             streamer.stdin.write(out_frame.tobytes())
-        except:
+        except BrokenPipeError:
             break
 
         time.sleep(1.0 / FPS)
