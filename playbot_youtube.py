@@ -1,5 +1,4 @@
 import requests
-import pyttsx3
 import time
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
@@ -7,17 +6,7 @@ import ffmpeg
 
 # ---------------- YouTube RTMP ----------------
 YOUTUBE_URL = "rtmp://a.rtmp.youtube.com/live2"
-STREAM_KEY = "YOUR_YOUTUBE_STREAM_KEY"
-
-# ---------------- TTS ----------------
-engine = pyttsx3.init('espeak')
-engine.setProperty("rate", 160)
-engine.setProperty("volume", 1.0)
-
-def speak_alert(text):
-    print("🎙️ PLAYBOT:", text)
-    engine.say(text)
-    engine.runAndWait()
+STREAM_KEY = "8z2g-s4ar-t1p8-9ab3-f90f"  # Replace with your key
 
 # ---------------- NOAA Alerts ----------------
 def fetch_noaa_alerts():
@@ -37,18 +26,28 @@ def fetch_noaa_alerts():
     except:
         return []
 
-# ---------------- Map Frame ----------------
+# ---------------- Map Frame with Bottom Text ----------------
 def create_frame(alerts):
+    # Black background
     img = np.zeros((720,1280,3), dtype=np.uint8)
-    img[:] = (0,0,0)
     pil = Image.fromarray(img)
     draw = ImageDraw.Draw(pil)
     font = ImageFont.load_default()
-    draw.text((10,10), "PlayBot 24/7 USA Weather Alerts", fill=(255,255,255), font=font)
-    y = 40
-    for a in alerts[:10]:
-        draw.text((10,y), f"{a['event']} — {a['areas']}", fill=(255,0,0), font=font)
+
+    # Draw a bottom text box
+    box_height = 120
+    draw.rectangle([0, 720-box_height, 1280, 720], fill=(30,30,30,200))
+
+    # Add alert texts at the bottom
+    y = 720 - box_height + 10
+    for a in alerts[:5]:  # show up to 5 alerts
+        text = f"{a['event']} — {a['areas']}"
+        draw.text((10, y), text, fill=(255,0,0), font=font)
         y += 20
+
+    # Title at the top
+    draw.text((10,10), "PlayBot 24/7 USA Weather Alerts", fill=(255,255,255), font=font)
+
     return np.array(pil)
 
 # ---------------- FFmpeg Stream ----------------
@@ -64,17 +63,14 @@ def start_ffmpeg():
 
 # ---------------- Main Loop ----------------
 def run_playbot():
-    print("🤖 PlayBot 24/7 Streaming with Voice")
+    print("🤖 PlayBot 24/7 Map + Alerts Stream")
     ffmpeg_proc = start_ffmpeg()
 
     while True:
         alerts = fetch_noaa_alerts()
-        for a in alerts[:5]:
-            speak_alert(f"{a['event']} in {a['areas']}")
-
         frame = create_frame(alerts)
         ffmpeg_proc.stdin.write(frame.tobytes())
-        time.sleep(60)
+        time.sleep(60)  # update every minute
 
 if __name__ == "__main__":
     run_playbot()
