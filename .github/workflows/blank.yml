@@ -1,9 +1,9 @@
 name: YallBot 24/7 Live Stream
 
 on:
-  workflow_dispatch:   # allows manual trigger
+  workflow_dispatch:   # manual trigger
   schedule:
-    - cron: "*/15 * * * *"  # optional: run every 15 minutes (can remove if manual only)
+    - cron: "*/30 * * * *"  # optional: run every 30 minutes
 
 jobs:
   run-yallbot:
@@ -14,7 +14,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2️⃣ Set up Python
+      # 2️⃣ Setup Python
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
@@ -30,13 +30,12 @@ jobs:
       - name: Install Python packages
         run: |
           python -m pip install --upgrade pip
-          pip install requests numpy pillow ffmpeg-python
+          pip install numpy pillow ffmpeg-python requests
 
-      # 5️⃣ Set YouTube Stream Key secret
-      - name: Set environment variable
+      # 5️⃣ Set environment variable for YouTube stream key
+      - name: Set Stream Key
         run: echo "YOUTUBE_STREAM_KEY=${{ secrets.YOUTUBE_STREAM_KEY }}" >> $GITHUB_ENV
 
-      # 6️⃣ Run Y'allBot
+      # 6️⃣ Run YallBot script
       - name: Run YallBot
-        run: |
-          python playbot.py
+        run: python playbot.py
