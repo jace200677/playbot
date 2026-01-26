@@ -32,6 +32,3 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests numpy pillow ffmpeg-python
 
-      # 5️⃣ Set stream key as secret (you should add YOUTUBE_STREAM_KEY in repo secrets)
-      - name: Set environment variable
-        run: echo "YOUTUBE_STREAM_KEY=${{ secrets.YOUTUBE_STREAM_K
