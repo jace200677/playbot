@@ -6,7 +6,7 @@ import ffmpeg
 
 # ---------------- YouTube RTMP ----------------
 YOUTUBE_URL = "rtmp://a.rtmp.youtube.com/live2"
-STREAM_KEY = "YOUR_STREAM_KEY"  # Replace with your actual key
+STREAM_KEY = "8z2g-s4ar-t1p8-9ab3-f90f"  # Replace with your actual key
 
 # ---------------- FFmpeg settings ----------------
 WIDTH = 1280
