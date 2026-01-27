@@ -14,11 +14,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2️⃣ Setup Node.js
+      # 2️⃣ Setup Node.js (Node 18 for wrtc compatibility)
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: "20"
+          node-version: "18"
 
       # 3️⃣ Install dependencies
       - name: Install dependencies
@@ -31,3 +31,5 @@ jobs:
       # 5️⃣ Run server
       - name: Start YallBot server
         run: node server.js
+        env:
+          YOUTUBE_STREAM_KEY: ${{ secrets.YOUTUBE_STREAM_KEY }}
