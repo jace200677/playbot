@@ -1,41 +1,37 @@
-name: YallBot 24/7 Live Stream
+name: YallBot Live Stream
 
 on:
-  workflow_dispatch:   # manual trigger
+  workflow_dispatch:  # manual trigger
   schedule:
-    - cron: "*/30 * * * *"  # optional: run every 30 minutes
+    - cron: '0 * * * *'  # optional: run every hour
 
 jobs:
-  run-yallbot:
+  live-stream:
     runs-on: ubuntu-latest
-
     steps:
-      # 1️⃣ Checkout the repository
+      # 1️⃣ Checkout repository
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2️⃣ Setup Python
-      - name: Setup Python
+      # 2️⃣ Set up Python
+      - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.10"
+          python-version: "3.11"
 
-      # 3️⃣ Install system dependencies
-      - name: Install system dependencies
+      # 3️⃣ Install dependencies
+      - name: Install dependencies
         run: |
-          sudo apt update
-          sudo apt install -y ffmpeg fonts-dejavu-core
-
-      # 4️⃣ Install Python packages
-      - name: Install Python packages
-        run: |
-          python -m pip install --upgrade pip
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-dejavu-core
+          pip install --upgrade pip
           pip install numpy pillow ffmpeg-python requests
 
-      # 5️⃣ Set environment variable for YouTube stream key
-      - name: Set Stream Key
+      # 4️⃣ Set YouTube Stream Key as secret
+      # In your repo: Settings → Secrets → YOUTUBE_STREAM_KEY
+      - name: Export YouTube Stream Key
         run: echo "YOUTUBE_STREAM_KEY=${{ secrets.YOUTUBE_STREAM_KEY }}" >> $GITHUB_ENV
 
-      # 6️⃣ Run YallBot script
+      # 5️⃣ Run Python Y’allBot
       - name: Run YallBot
-        run: python playbot.py
+        run: python pallbot.py
