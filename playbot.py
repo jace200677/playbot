@@ -3,12 +3,13 @@ import requests
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 import ffmpeg
+import threading
 
 # ---------------- SETTINGS ----------------
 WIDTH, HEIGHT = 1280, 720
 FPS = 5
-YOUTUBE_STREAM_KEY = "fvgb-pzbe-4j7g-vej0-6g7q"  # replace with your actual key
-YOUTUBE_URL = f"rtmps://a.rtmp.youtube.com/live2/{YOUTUBE_STREAM_KEY}"
+YOUTUBE_STREAM_KEY = "fvgb-pzbe-4j7g-vej0-6g7q"  # Replace with your actual stream key
+YOUTUBE_URL = f"rtmps://a.rtmp.youtube.com/live2/fvgb-pzbe-4j7g-vej0-6g7q"
 
 # Fonts
 FONT_LARGE = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 30)
@@ -25,22 +26,38 @@ PRIORITY = {
     "Severe Thunderstorm Watch": 50
 }
 
-# ---------------- START RTMP STREAM ----------------
+# ---------------- START RTMPS STREAM ----------------
 def start_stream():
-    """Start FFmpeg process streaming to YouTube RTMPS."""
     try:
         print("🚀 Starting Y’allBot RTMPS stream...")
         streamer = (
-            ffmpeg
-            .input("pipe:", format="rawvideo", pix_fmt="rgb24",
-                   s=f"{WIDTH}x{HEIGHT}", framerate=FPS)
-            .output(YOUTUBE_URL, format="flv",
-                    vcodec="libx264", pix_fmt="yuv420p",
-                    preset="veryfast", g=FPS*2)
+            ffmpeg.input(
+                "pipe:", format="rawvideo", pix_fmt="rgb24",
+                s=f"{WIDTH}x{HEIGHT}", framerate=FPS
+            )
+            .output(
+                YOUTUBE_URL,
+                format="flv",
+                vcodec="libx264",
+                pix_fmt="yuv420p",
+                preset="veryfast",
+                g=FPS*2,
+                acodec="aac",        # dummy audio
+                audio_bitrate="128k",
+                ar="44100",
+                ac=2
+            )
             .overwrite_output()
-            .run_async(pipe_stdin=True)
+            .run_async(pipe_stdin=True, pipe_stderr=True)
         )
-        # test if stdin is writable
+
+        # Thread to print FFmpeg stderr
+        def log_ffmpeg(proc):
+            for line in iter(proc.stderr.readline, b''):
+                print("FFmpeg:", line.decode(), end='')
+        threading.Thread(target=log_ffmpeg, args=(streamer,), daemon=True).start()
+
+        # Send one black frame to test connection
         streamer.stdin.write(np.zeros((HEIGHT, WIDTH, 3), dtype=np.uint8).tobytes())
         print("✅ Connected to YouTube successfully!")
         return streamer
@@ -74,19 +91,19 @@ def draw_frame(alerts, ticker_x):
     pil = Image.fromarray(frame)
     draw = ImageDraw.Draw(pil)
 
-    # ---------------- Title bar ----------------
+    # Title bar
     draw.rectangle((0, 0, WIDTH, 40), fill=(0, 0, 0))
     draw.text((10, 5), "Y’allBot 24/7 USA Weather Alerts with Map",
               font=FONT_LARGE, fill=(255, 255, 255))
 
-    # ---------------- Top alert box ----------------
+    # Top alert box
     if alerts:
         top = alerts[0]
         fill = (255, 0, 0) if "Tornado" in top["event"] else (255, 140, 0)
         draw.rectangle((0, 50, WIDTH, 100), fill=fill)
         draw.text((10, 55), f"{top['event']} — {top['area']}", font=FONT_MED, fill=(0, 0, 0))
 
-    # ---------------- Side panel ----------------
+    # Side panel
     draw.rectangle((WIDTH-280, 110, WIDTH-10, 270), fill=(20, 20, 20))
     draw.text((WIDTH-270, 120), "Active Warnings", font=FONT_MED, fill=(255, 255, 255))
     y = 155
@@ -94,19 +111,18 @@ def draw_frame(alerts, ticker_x):
         draw.text((WIDTH-270, y), a["event"], font=FONT_SMALL, fill=(255, 0, 0))
         y += 24
 
-    # ---------------- Map display ----------------
+    # Map display
     map_x0, map_y0 = 50, 120
     map_x1, map_y1 = 700, 500
     draw.rectangle((map_x0, map_y0, map_x1, map_y1), fill=(30, 30, 60))
-
-    # Example: highlight Oregon/Washington if any alerts in these states
+    # Example highlights (Oregon/Washington)
     for a in alerts:
         if "Oregon" in a["area"]:
             draw.rectangle((map_x0+50, map_y0+50, map_x0+150, map_y0+150), fill=(255, 0, 0))
         if "Washington" in a["area"]:
             draw.rectangle((map_x0+50, map_y0+10, map_x0+150, map_y0+60), fill=(255, 0, 0))
 
-    # ---------------- Scrolling ticker ----------------
+    # Scrolling ticker
     crawl = " | ".join([f"{a['event']} - {a['area']}" for a in alerts])
     draw.rectangle((0, HEIGHT-60, WIDTH, HEIGHT), fill=(0, 0, 0))
     draw.text((ticker_x, HEIGHT-45), crawl, font=FONT_MED, fill=(255, 0, 0))
@@ -126,8 +142,8 @@ def main():
             time.sleep(10)
             continue
 
-        frame_id = 0
         try:
+            frame_id = 0
             while True:
                 # Update alerts every 30 seconds
                 if time.time() - last_alert > 30:
@@ -139,6 +155,7 @@ def main():
                 if ticker_x < -crawl_width:
                     ticker_x = WIDTH
 
+                # Send frame
                 streamer.stdin.write(frame.tobytes())
                 frame_id += 1
                 time.sleep(1 / FPS)
