@@ -10,7 +10,7 @@ WIDTH, HEIGHT = 1280, 720
 FPS = 5
 
 # Your YouTube stream key
-YOUTUBE_STREAM_KEY = "abcd-efgh-ijkl-mnop"  # <-- Replace with your key
+YOUTUBE_STREAM_KEY = "fvgb-pzbe-4j7g-vej0-6g7q"  # <-- Replace with your key
 YOUTUBE_URL = f"rtmp://a.rtmp.youtube.com/live2/{YOUTUBE_STREAM_KEY}"
 
 # Fonts
