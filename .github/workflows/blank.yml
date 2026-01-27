@@ -1,37 +1,33 @@
-name: YallBot Live Stream
+name: Deploy YallBot Server
 
 on:
-  workflow_dispatch:  # manual trigger
-  schedule:
-    - cron: '0 * * * *'  # optional: run every hour
+  push:
+    branches:
+      - main
+  workflow_dispatch:
 
 jobs:
-  live-stream:
+  setup-and-run:
     runs-on: ubuntu-latest
     steps:
-      # 1️⃣ Checkout repository
+      # 1️⃣ Checkout repo
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2️⃣ Set up Python
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      # 2️⃣ Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
         with:
-          python-version: "3.11"
+          node-version: "20"
 
       # 3️⃣ Install dependencies
       - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg fonts-dejavu-core
-          pip install --upgrade pip
-          pip install numpy pillow ffmpeg-python requests
+        run: npm install
 
-      # 4️⃣ Set YouTube Stream Key as secret
-      # In your repo: Settings → Secrets → YOUTUBE_STREAM_KEY
-      - name: Export YouTube Stream Key
-        run: echo "YOUTUBE_STREAM_KEY=${{ secrets.YOUTUBE_STREAM_KEY }}" >> $GITHUB_ENV
+      # 4️⃣ Install FFmpeg
+      - name: Install FFmpeg
+        run: sudo apt update && sudo apt install -y ffmpeg
 
-      # 5️⃣ Run Python Y’allBot
-      - name: Run YallBot
-        run: python playbot.py
+      # 5️⃣ Run server
+      - name: Start YallBot server
+        run: node server.js
