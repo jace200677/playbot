@@ -1,24 +1,21 @@
-import os
 import time
 import requests
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 import ffmpeg
 
-# ------------------ SETTINGS ------------------
+# ---------------- SETTINGS ----------------
 WIDTH, HEIGHT = 1280, 720
 FPS = 5
-
-# Your YouTube stream key
-YOUTUBE_STREAM_KEY = "fvgb-pzbe-4j7g-vej0-6g7q"  # <-- Replace with your key
-YOUTUBE_URL = f"rtmp://a.rtmp.youtube.com/live2/{YOUTUBE_STREAM_KEY}"
+YOUTUBE_STREAM_KEY = "YOUR_REAL_KEY_HERE"  # Replace with your real YouTube key
+YOUTUBE_URL = f"rtmps://a.rtmp.youtube.com/live2/{YOUTUBE_STREAM_KEY}"
 
 # Fonts
 FONT_LARGE = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 30)
 FONT_MED   = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 22)
 FONT_SMALL = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 18)
 
-# ------------------ ALERT PRIORITY ------------------
+# Alert priority
 PRIORITY = {
     "Tornado Emergency": 100,
     "Tornado Warning": 95,
@@ -28,9 +25,10 @@ PRIORITY = {
     "Severe Thunderstorm Watch": 50
 }
 
-# ------------------ START RTMP ------------------
-def start_rtmp():
-    print("🚀 Starting Y’allBot Live Stream to YouTube...")
+# ---------------- START RTMP STREAM ----------------
+def start_stream():
+    """Start FFmpeg process streaming to YouTube RTMPS."""
+    print("🚀 Starting Y’allBot RTMPS stream...")
     return (
         ffmpeg
         .input("pipe:", format="rawvideo", pix_fmt="rgb24",
@@ -42,13 +40,12 @@ def start_rtmp():
         .run_async(pipe_stdin=True)
     )
 
-# ------------------ FETCH NOAA ALERTS ------------------
+# ---------------- FETCH NOAA ALERTS ----------------
 def fetch_noaa_alerts():
     try:
         res = requests.get("https://api.weather.gov/alerts/active", timeout=8)
         data = res.json()
         alerts = []
-
         for f in data.get("features", []):
             props = f.get("properties", {})
             event = props.get("event")
@@ -58,31 +55,30 @@ def fetch_noaa_alerts():
                     "area": props.get("areaDesc", ""),
                     "severity": PRIORITY[event]
                 })
-
         alerts.sort(key=lambda x: x["severity"], reverse=True)
         return alerts
     except:
         return []
 
-# ------------------ DRAW FRAME ------------------
+# ---------------- DRAW FRAME ----------------
 def draw_frame(alerts, ticker_x):
     frame = np.zeros((HEIGHT, WIDTH, 3), dtype=np.uint8)
     pil = Image.fromarray(frame)
     draw = ImageDraw.Draw(pil)
 
-    # Top title bar
+    # Title bar
     draw.rectangle((0, 0, WIDTH, 40), fill=(0, 0, 0))
     draw.text((10, 5), "Y’allBot 24/7 USA Weather Alerts (Ryan Hall style)",
               font=FONT_LARGE, fill=(255, 255, 255))
 
-    # Top alert box (highest priority)
+    # Top alert box
     if alerts:
         top = alerts[0]
         fill = (255, 0, 0) if "Tornado" in top["event"] else (255, 140, 0)
         draw.rectangle((0, 50, WIDTH, 100), fill=fill)
         draw.text((10, 55), f"{top['event']} — {top['area']}", font=FONT_MED, fill=(0, 0, 0))
 
-    # Side panel for other alerts
+    # Side panel
     draw.rectangle((WIDTH-280, 110, WIDTH-10, 270), fill=(20, 20, 20))
     draw.text((WIDTH-270, 120), "Active Warnings", font=FONT_MED, fill=(255, 255, 255))
     y = 155
@@ -90,42 +86,47 @@ def draw_frame(alerts, ticker_x):
         draw.text((WIDTH-270, y), a["event"], font=FONT_SMALL, fill=(255, 0, 0))
         y += 24
 
-    # Scrolling ticker
+    # Ticker
     crawl = " | ".join([f"{a['event']} - {a['area']}" for a in alerts])
     draw.rectangle((0, HEIGHT-60, WIDTH, HEIGHT), fill=(0, 0, 0))
     draw.text((ticker_x, HEIGHT-45), crawl, font=FONT_MED, fill=(255, 0, 0))
 
-    return np.array(pil), len(crawl) * 12
+    return np.array(pil), len(crawl)*12
 
-# ------------------ MAIN LOOP ------------------
+# ---------------- MAIN LOOP ----------------
 def main():
-    streamer = start_rtmp()
     ticker_x = WIDTH
     last_alert = 0
     alerts = []
 
-    print("🚀 Y’allBot running. Press Ctrl+C to stop.")
-
-    frame_id = 0
     while True:
-        # Update alerts every 30 seconds
-        if time.time() - last_alert > 30:
-            alerts = fetch_noaa_alerts()
-            last_alert = time.time()
-
-        frame, crawl_width = draw_frame(alerts, ticker_x)
-        ticker_x -= 5
-        if ticker_x < -crawl_width:
-            ticker_x = WIDTH
-
         try:
-            streamer.stdin.write(frame.tobytes())
-            frame_id += 1
-        except BrokenPipeError:
-            print("❌ Stream disconnected")
-            break
+            streamer = start_stream()
+            print("✅ Stream connected. Starting frame loop.")
 
-        time.sleep(1 / FPS)
+            frame_id = 0
+            while True:
+                # Update alerts every 30 seconds
+                if time.time() - last_alert > 30:
+                    alerts = fetch_noaa_alerts()
+                    last_alert = time.time()
+
+                frame, crawl_width = draw_frame(alerts, ticker_x)
+                ticker_x -= 5
+                if ticker_x < -crawl_width:
+                    ticker_x = WIDTH
+
+                # Push frame
+                streamer.stdin.write(frame.tobytes())
+                frame_id += 1
+                time.sleep(1 / FPS)
+
+        except BrokenPipeError:
+            print("❌ Stream disconnected, retrying in 10 seconds...")
+            time.sleep(10)
+        except Exception as e:
+            print(f"⚠️ Error: {e}, retrying in 10 seconds...")
+            time.sleep(10)
 
 if __name__ == "__main__":
     main()
