@@ -34,4 +34,4 @@ jobs:
 
       # 5️⃣ Run Python Y’allBot
       - name: Run YallBot
-        run: python pallbot.py
+        run: python playbot.py
