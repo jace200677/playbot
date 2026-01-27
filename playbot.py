@@ -7,7 +7,7 @@ import ffmpeg
 # ---------------- SETTINGS ----------------
 WIDTH, HEIGHT = 1280, 720
 FPS = 5
-YOUTUBE_STREAM_KEY = "YOUR_REAL_KEY_HERE"  # replace with your actual key
+YOUTUBE_STREAM_KEY = "fvgb-pzbe-4j7g-vej0-6g7q"  # replace with your actual key
 YOUTUBE_URL = f"rtmps://a.rtmp.youtube.com/live2/{YOUTUBE_STREAM_KEY}"
 
 # Fonts
