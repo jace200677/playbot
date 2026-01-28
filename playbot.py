@@ -4,18 +4,16 @@ import requests
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 import ffmpeg
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
 
 # ------------------ STREAM SETTINGS ------------------
 RTMP_URL = "rtmp://a.rtmp.youtube.com/live2"
-STREAM_KEY = "fvgb-pzbe-4j7g-vej0-6g7q"  # Your stream key
+STREAM_KEY = "fvgb-pzbe-4j7g-vej0-6g7q"  # Set as GitHub secret
 WIDTH, HEIGHT = 1280, 720
 FPS = 5
 
 # ------------------ FONTS ------------------
 FONT_LARGE = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 30)
-FONT_MED   = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 22)
+FONT_MED = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 22)
 FONT_SMALL = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 18)
 
 # ------------------ ALERT PRIORITY ------------------
@@ -28,8 +26,9 @@ PRIORITY = {
     "Severe Thunderstorm Watch": 50
 }
 
-# ------------------ START FFmpeg ------------------
+# ------------------ RTMP PROCESS ------------------
 def start_ffmpeg():
+    # Video input from pipe
     video_input = ffmpeg.input(
         'pipe:',
         format='rawvideo',
@@ -38,11 +37,13 @@ def start_ffmpeg():
         framerate=FPS
     )
 
+    # Silent audio input
     audio_input = ffmpeg.input(
         'anullsrc=r=44100:cl=stereo',
         f='lavfi'
     )
 
+    # Output to YouTube RTMP
     process = ffmpeg.output(
         video_input,
         audio_input,
@@ -56,6 +57,8 @@ def start_ffmpeg():
     ).overwrite_output().run_async(pipe_stdin=True)
 
     return process
+
+
 
 # ------------------ FETCH NOAA ALERTS ------------------
 def fetch_noaa_alerts():
@@ -72,51 +75,32 @@ def fetch_noaa_alerts():
                     "area": props.get("areaDesc", ""),
                     "severity": PRIORITY[event]
                 })
+        # Sort by severity descending
         alerts.sort(key=lambda x: x["severity"], reverse=True)
         return alerts
     except:
         return []
 
-# ------------------ INIT HEADLESS CHROME ------------------
-def init_map():
-    options = Options()
-    options.headless = False
-    options.add_argument("--window-size=1280,720")  # Match your video frame size
-    driver = webdriver.Chrome(options=options)
-
-    # Load map from GitHub Pages
-    driver.get("https://jace200677.github.io/playbot/map.html")
-    time.sleep(2)  # Allow map tiles to load
-
-    return driver
-
-def update_map(driver, alerts):
-    alerts_js = [{"event": a["event"], "area": a["area"]} for a in alerts]
-    driver.execute_script(f"drawAlerts({alerts_js})")
-    time.sleep(0.5)
-    screenshot = driver.get_screenshot_as_png()
-    img = Image.open(io.BytesIO(screenshot)).resize((650, 380))
-    return img
-
 # ------------------ DRAW FRAME ------------------
-import io
-def draw_frame(alerts, ticker_x, map_img=None):
+# ------------------ DRAW FRAME ------------------
+def draw_frame(alerts, ticker_x):
+    # Black background
     frame = np.zeros((HEIGHT, WIDTH, 3), dtype=np.uint8)
     pil = Image.fromarray(frame)
     draw = ImageDraw.Draw(pil)
 
-    # Title
+    # Title bar
     draw.rectangle((0,0,WIDTH,40), fill=(0,0,0))
     draw.text((10,5), "PlayBot 24/7 USA Weather Alerts", font=FONT_LARGE, fill=(255,255,255))
 
-    # Top alert
+    # Top alert box (highest priority)
     if alerts:
         top = alerts[0]
         fill = (255,0,0) if "Tornado" in top["event"] else (255,140,0)
         draw.rectangle((0,50,WIDTH,100), fill=fill)
         draw.text((10,55), f"{top['event']} — {top['area']}", font=FONT_MED, fill=(0,0,0))
 
-    # Side panel
+    # Side panel for other alerts
     draw.rectangle((WIDTH-280,110,WIDTH-10,270), fill=(20,20,20))
     draw.text((WIDTH-270,120), "Active Warnings", font=FONT_MED, fill=(255,255,255))
     y=155
@@ -124,34 +108,44 @@ def draw_frame(alerts, ticker_x, map_img=None):
         draw.text((WIDTH-270,y), a["event"], font=FONT_SMALL, fill=(255,0,0))
         y += 24
 
-    # Map
-    if map_img:
-        pil.paste(map_img, (50,120))
+    # ------------------ MAP DISPLAY ------------------
+    map_x0, map_y0 = 50, 120
+    map_x1, map_y1 = 700, 500
+    draw.rectangle((map_x0, map_y0, map_x1, map_y1), fill=(30, 30, 60))  # Map background
 
-    # Ticker
+    # Highlight states based on alerts
+    for alert in alerts:
+        area = alert["area"].lower()
+        if "oregon" in area:
+            draw.rectangle((map_x0+50, map_y0+50, map_x0+150, map_y0+150), fill=(255,0,0))  # Example highlight
+        if "washington" in area:
+            draw.rectangle((map_x0+50, map_y0+10, map_x0+150, map_y0+60), fill=(255,0,0))
+        # Add more states as needed:
+        # if "california" in area: draw.rectangle(...)
+
+    # ------------------ SCROLLING TICKER ------------------
     crawl = " | ".join([f"{a['event']} - {a['area']}" for a in alerts])
     draw.rectangle((0,HEIGHT-60,WIDTH,HEIGHT), fill=(0,0,0))
     draw.text((ticker_x, HEIGHT-45), crawl, font=FONT_MED, fill=(255,0,0))
 
     return np.array(pil), len(crawl)*12
 
+
 # ------------------ MAIN LOOP ------------------
 def main():
-    print("🚀 Starting PlayBot Live Stream")
+    print("🚀 Starting Y’allBot Live Stream")
     streamer = start_ffmpeg()
-    driver = init_map()
     ticker_x = WIDTH
     last_alert = 0
     alerts = []
-    map_img = None
 
     while True:
+        # Update alerts every 30 seconds
         if time.time() - last_alert > 30:
             alerts = fetch_noaa_alerts()
             last_alert = time.time()
-            map_img = update_map(driver, alerts)
 
-        frame, crawl_width = draw_frame(alerts, ticker_x, map_img)
+        frame, crawl_width = draw_frame(alerts, ticker_x)
         ticker_x -= 5
         if ticker_x < -crawl_width:
             ticker_x = WIDTH
@@ -165,4 +159,4 @@ def main():
         time.sleep(1.0 / FPS)
 
 if __name__ == "__main__":
-    main()
+    main() add leaflet map
