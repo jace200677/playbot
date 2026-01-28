@@ -82,6 +82,7 @@ def fetch_noaa_alerts():
         return []
 
 # ------------------ DRAW FRAME ------------------
+# ------------------ DRAW FRAME ------------------
 def draw_frame(alerts, ticker_x):
     # Black background
     frame = np.zeros((HEIGHT, WIDTH, 3), dtype=np.uint8)
@@ -90,7 +91,7 @@ def draw_frame(alerts, ticker_x):
 
     # Title bar
     draw.rectangle((0,0,WIDTH,40), fill=(0,0,0))
-    draw.text((10,5), "Y’allBot 24/7 USA Weather Alerts", font=FONT_LARGE, fill=(255,255,255))
+    draw.text((10,5), "PlayBot 24/7 USA Weather Alerts", font=FONT_LARGE, fill=(255,255,255))
 
     # Top alert box (highest priority)
     if alerts:
@@ -107,12 +108,28 @@ def draw_frame(alerts, ticker_x):
         draw.text((WIDTH-270,y), a["event"], font=FONT_SMALL, fill=(255,0,0))
         y += 24
 
-    # Ticker
+    # ------------------ MAP DISPLAY ------------------
+    map_x0, map_y0 = 50, 120
+    map_x1, map_y1 = 700, 500
+    draw.rectangle((map_x0, map_y0, map_x1, map_y1), fill=(30, 30, 60))  # Map background
+
+    # Highlight states based on alerts
+    for alert in alerts:
+        area = alert["area"].lower()
+        if "oregon" in area:
+            draw.rectangle((map_x0+50, map_y0+50, map_x0+150, map_y0+150), fill=(255,0,0))  # Example highlight
+        if "washington" in area:
+            draw.rectangle((map_x0+50, map_y0+10, map_x0+150, map_y0+60), fill=(255,0,0))
+        # Add more states as needed:
+        # if "california" in area: draw.rectangle(...)
+
+    # ------------------ SCROLLING TICKER ------------------
     crawl = " | ".join([f"{a['event']} - {a['area']}" for a in alerts])
     draw.rectangle((0,HEIGHT-60,WIDTH,HEIGHT), fill=(0,0,0))
     draw.text((ticker_x, HEIGHT-45), crawl, font=FONT_MED, fill=(255,0,0))
 
     return np.array(pil), len(crawl)*12
+
 
 # ------------------ MAIN LOOP ------------------
 def main():
