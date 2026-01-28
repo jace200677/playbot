@@ -1,4 +1,4 @@
-name: Deploy YallBot Server
+name: Deploy YallBot Server (Python)
 
 on:
   push:
@@ -14,22 +14,24 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2️⃣ Setup Node.js (Node 18 for wrtc compatibility)
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
+      # 2️⃣ Setup Python (Python 3.11 recommended)
+      - name: Setup Python
+        uses: actions/setup-python@v4
         with:
-          node-version: "18"
+          python-version: "3.11"
 
       # 3️⃣ Install dependencies
       - name: Install dependencies
-        run: npm install -g node-pre-gyp && npm install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
       # 4️⃣ Install FFmpeg
       - name: Install FFmpeg
         run: sudo apt update && sudo apt install -y ffmpeg
 
-      # 5️⃣ Run server
-      - name: Start YallBot server
-        run: node server.js
+      # 5️⃣ Run Python server
+      - name: Start Python server
+        run: python playbot.py
         env:
           YOUTUBE_STREAM_KEY: ${{ secrets.YOUTUBE_STREAM_KEY }}
