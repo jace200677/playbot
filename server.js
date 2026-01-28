@@ -2,7 +2,7 @@ const WebSocket = require('ws');
 const { spawn } = require('child_process');
 
 // Replace with your actual YouTube stream key
-const YT_URL = `rtmps://a.rtmp.youtube.com/live2/fvgb-pzbe-4j7g-vej0-6g7q`;
+const YT_URL = `rtmps://a.rtmp.youtube.com/live2/zqzd-50eu-s3fy-0gvz-9b36`;
 
 // WebSocket server
 const wss = new WebSocket.Server({ port: 8443 });
