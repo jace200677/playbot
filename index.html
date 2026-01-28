@@ -3,100 +3,61 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Y’allBot 24/7 Alerts</title>
+<title>Canvas to YouTube Live</title>
 <style>
-  body { margin: 0; background: #111; color: #fff; font-family: sans-serif; }
-  canvas { display: block; margin: 0 auto; background: #000; }
+body { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; background:#222; color:#fff; font-family:sans-serif; }
+canvas { border:2px solid #fff; }
 </style>
 </head>
 <body>
-<canvas id="canvas" width="1280" height="720"></canvas>
+
+<canvas id="myCanvas" width="1280" height="720"></canvas>
 
 <script>
-const canvas = document.getElementById('canvas');
+const canvas = document.getElementById('myCanvas');
 const ctx = canvas.getContext('2d');
 
-// Connect to your Node.js WebSocket server
-const ws = new WebSocket('ws://localhost:8443'); // change host if remote
+// Draw some test animation
+let x = 0;
+function drawFrame() {
+    ctx.fillStyle = '#222';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = '#f5c542';
+    ctx.beginPath();
+    ctx.arc(100 + x, 360, 50, 0, Math.PI * 2);
+    ctx.fill();
+
+    x += 5;
+    if(x > canvas.width) x = -50;
+}
+
+// WebSocket connection
+const ws = new WebSocket('ws://localhost:8443');
 
 ws.onopen = () => {
-  console.log("Connected to Node.js server");
-  requestAnimationFrame(drawAndSend);
+    console.log('Connected to server');
+
+    // Send frames at 5 FPS
+    setInterval(() => {
+        drawFrame();
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const rgb = rgbaToRgb24(imageData.data);
+        ws.send(rgb);
+    }, 1000 / 5);
 };
 
-// Mock alerts for demonstration
-let alerts = [
-  { event: "Tornado Warning", area: "Oregon" },
-  { event: "Flash Flood Warning", area: "Washington" },
-  { event: "Severe Thunderstorm Watch", area: "California" }
-];
-
-let tickerX = canvas.width;
-
-// Draw frame and send via WebSocket
-function drawAndSend() {
-  // Clear canvas
-  ctx.fillStyle = "#111";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  // Title bar
-  ctx.fillStyle = "#000";
-  ctx.fillRect(0, 0, canvas.width, 40);
-  ctx.fillStyle = "#fff";
-  ctx.font = "30px sans-serif";
-  ctx.fillText("Y’allBot 24/7 USA Weather Alerts", 10, 30);
-
-  // Top alert
-  if (alerts.length) {
-    ctx.fillStyle = alerts[0].event.includes("Tornado") ? "#f00" : "#ff8c00";
-    ctx.fillRect(0, 50, canvas.width, 50);
-    ctx.fillStyle = "#000";
-    ctx.font = "22px sans-serif";
-    ctx.fillText(`${alerts[0].event} — ${alerts[0].area}`, 10, 85);
-  }
-
-  // Side panel
-  ctx.fillStyle = "#222";
-  ctx.fillRect(canvas.width - 280, 110, 270, 160);
-  ctx.fillStyle = "#fff";
-  ctx.font = "22px sans-serif";
-  ctx.fillText("Active Warnings", canvas.width - 270, 135);
-
-  ctx.font = "18px sans-serif";
-  let y = 155;
-  for (let i = 0; i < Math.min(alerts.length, 6); i++) {
-    ctx.fillStyle = "#f00";
-    ctx.fillText(alerts[i].event, canvas.width - 270, y);
-    y += 24;
-  }
-
-  // Map mockup
-  ctx.fillStyle = "#1e1e3c";
-  ctx.fillRect(50, 120, 650, 380);
-  ctx.fillStyle = "#f00";
-  alerts.forEach(a => {
-    if (a.area.includes("Oregon")) ctx.fillRect(100, 150, 100, 100);
-    if (a.area.includes("Washington")) ctx.fillRect(100, 130, 100, 50);
-  });
-
-  // Ticker
-  ctx.fillStyle = "#000";
-  ctx.fillRect(0, canvas.height - 60, canvas.width, 60);
-  ctx.fillStyle = "#f00";
-  ctx.font = "22px sans-serif";
-  const crawl = alerts.map(a => `${a.event} - ${a.area}`).join(" | ");
-  ctx.fillText(crawl, tickerX, canvas.height - 30);
-  tickerX -= 5;
-  if (tickerX < -crawl.length * 12) tickerX = canvas.width;
-
-  // Send raw frame to server
-  if (ws.readyState === WebSocket.OPEN) {
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    ws.send(imageData.data.buffer);
-  }
-
-  requestAnimationFrame(drawAndSend);
+// Convert RGBA (4 bytes) to RGB24 (3 bytes)
+function rgbaToRgb24(rgba) {
+    const rgb = new Uint8Array((rgba.length / 4) * 3);
+    for (let i = 0, j = 0; i < rgba.length; i += 4, j += 3) {
+        rgb[j]   = rgba[i];     // R
+        rgb[j+1] = rgba[i+1];   // G
+        rgb[j+2] = rgba[i+2];   // B
+    }
+    return rgb;
 }
 </script>
+
 </body>
 </html>
