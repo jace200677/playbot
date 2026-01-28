@@ -7,7 +7,7 @@ import ffmpeg
 
 # ------------------ STREAM SETTINGS ------------------
 RTMP_URL = "rtmp://a.rtmp.youtube.com/live2"
-STREAM_KEY = os.environ.get("YOUTUBE_STREAM_KEY")  # Set as GitHub secret
+STREAM_KEY = "fvgb-pzbe-4j7g-vej0-6g7q"  # Set as GitHub secret
 WIDTH, HEIGHT = 1280, 720
 FPS = 5
 
@@ -28,25 +28,36 @@ PRIORITY = {
 
 # ------------------ RTMP PROCESS ------------------
 def start_ffmpeg():
-    # FFmpeg command with silent audio
-    process = (
-        ffmpeg
-        .input('pipe:', format='rawvideo', pix_fmt='rgb24', s=f'{WIDTH}x{HEIGHT}', framerate=FPS)
-        # Add silent audio track
-        .input('anullsrc=r=44100:cl=stereo', f='lavfi')
-        .output(
-            f'{RTMP_URL}/{STREAM_KEY}',
-            format='flv',
-            vcodec='libx264',
-            pix_fmt='yuv420p',
-            preset='veryfast',
-            acodec='aac',       # Encode silent audio
-            audio_bitrate='128k'
-        )
-        .overwrite_output()
-        .run_async(pipe_stdin=True)
+    # Video input from pipe
+    video_input = ffmpeg.input(
+        'pipe:',
+        format='rawvideo',
+        pix_fmt='rgb24',
+        s=f'{WIDTH}x{HEIGHT}',
+        framerate=FPS
     )
+
+    # Silent audio input
+    audio_input = ffmpeg.input(
+        'anullsrc=r=44100:cl=stereo',
+        f='lavfi'
+    )
+
+    # Output to YouTube RTMP
+    process = ffmpeg.output(
+        video_input,
+        audio_input,
+        f'{RTMP_URL}/{STREAM_KEY}',
+        format='flv',
+        vcodec='libx264',
+        pix_fmt='yuv420p',
+        preset='veryfast',
+        acodec='aac',
+        audio_bitrate='128k'
+    ).overwrite_output().run_async(pipe_stdin=True)
+
     return process
+
 
 
 # ------------------ FETCH NOAA ALERTS ------------------
