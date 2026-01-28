@@ -28,14 +28,26 @@ PRIORITY = {
 
 # ------------------ RTMP PROCESS ------------------
 def start_ffmpeg():
+    # FFmpeg command with silent audio
     process = (
         ffmpeg
         .input('pipe:', format='rawvideo', pix_fmt='rgb24', s=f'{WIDTH}x{HEIGHT}', framerate=FPS)
-        .output(f'{RTMP_URL}/{STREAM_KEY}', format='flv', vcodec='libx264', pix_fmt='yuv420p', preset='veryfast')
+        # Add silent audio track
+        .input('anullsrc=r=44100:cl=stereo', f='lavfi')
+        .output(
+            f'{RTMP_URL}/{STREAM_KEY}',
+            format='flv',
+            vcodec='libx264',
+            pix_fmt='yuv420p',
+            preset='veryfast',
+            acodec='aac',       # Encode silent audio
+            audio_bitrate='128k'
+        )
         .overwrite_output()
         .run_async(pipe_stdin=True)
     )
     return process
+
 
 # ------------------ FETCH NOAA ALERTS ------------------
 def fetch_noaa_alerts():
