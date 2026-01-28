@@ -80,7 +80,7 @@ def fetch_noaa_alerts():
 # ------------------ INIT HEADLESS CHROME ------------------
 def init_map():
     options = Options()
-    options.headless = True
+    options.headless = False
     options.add_argument("--window-size=1280,720")  # Match your video frame size
     driver = webdriver.Chrome(options=options)
 
