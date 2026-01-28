@@ -22,7 +22,7 @@ jobs:
 
       # 3️⃣ Install dependencies
       - name: Install dependencies
-        run: npm install -g node-pre-gyp
+        run: npm install -g node-pre-gyp && npm install
 
       # 4️⃣ Install FFmpeg
       - name: Install FFmpeg
