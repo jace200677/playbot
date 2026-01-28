@@ -9,7 +9,7 @@ import threading
 WIDTH, HEIGHT = 1280, 720
 FPS = 5
 YOUTUBE_STREAM_KEY = "fvgb-pzbe-4j7g-vej0-6g7q"  # Replace with your actual stream key
-YOUTUBE_URL = f"rtmps://a.rtmp.youtube.com/live2/fvgb-pzbe-4j7g-vej0-6g7q"
+YOUTUBE_URL = f"rtmp://a.rtmp.youtube.com/live2/fvgb-pzbe-4j7g-vej0-6g7q"
 
 # Fonts
 FONT_LARGE = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 30)
@@ -29,11 +29,17 @@ PRIORITY = {
 # ---------------- START RTMPS STREAM ----------------
 def start_stream():
     try:
-        print("🚀 Starting Y’allBot RTMPS stream...")
+        print("🚀 Starting Y’allBot RTMPS stream with silent audio...")
+
         streamer = (
             ffmpeg.input(
                 "pipe:", format="rawvideo", pix_fmt="rgb24",
                 s=f"{WIDTH}x{HEIGHT}", framerate=FPS
+            )
+            # Add a silent audio input
+            .input(
+                "anullsrc=channel_layout=stereo:sample_rate=44100",
+                f='lavfi'
             )
             .output(
                 YOUTUBE_URL,
@@ -42,10 +48,12 @@ def start_stream():
                 pix_fmt="yuv420p",
                 preset="veryfast",
                 g=FPS*2,
-                acodec="aac",        # dummy audio
+                b='4500k',          # Video bitrate
+                acodec="aac",       # Audio codec
                 audio_bitrate="128k",
                 ar="44100",
-                ac=2
+                ac=2,
+                shortest=None       # Stop stream if any input ends
             )
             .overwrite_output()
             .run_async(pipe_stdin=True, pipe_stderr=True)
@@ -61,6 +69,7 @@ def start_stream():
         streamer.stdin.write(np.zeros((HEIGHT, WIDTH, 3), dtype=np.uint8).tobytes())
         print("✅ Connected to YouTube successfully!")
         return streamer
+
     except Exception as e:
         print(f"⚠️ Failed to start stream: {e}")
         return None
