@@ -1,22 +1,22 @@
+import os
 import time
 import requests
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 import ffmpeg
-import threading
 
-# ---------------- SETTINGS ----------------
+# ------------------ STREAM SETTINGS ------------------
+RTMP_URL = "rtmp://a.rtmp.youtube.com/live2"
+STREAM_KEY = os.environ.get("YOUTUBE_STREAM_KEY")  # Set as GitHub secret
 WIDTH, HEIGHT = 1280, 720
 FPS = 5
-YOUTUBE_STREAM_KEY = "fvgb-pzbe-4j7g-vej0-6g7q"  # Replace with your actual stream key
-YOUTUBE_URL = f"rtmp://a.rtmp.youtube.com/live2/fvgb-pzbe-4j7g-vej0-6g7q"
 
-# Fonts
+# ------------------ FONTS ------------------
 FONT_LARGE = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 30)
-FONT_MED   = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 22)
+FONT_MED = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 22)
 FONT_SMALL = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 18)
 
-# Alert priority
+# ------------------ ALERT PRIORITY ------------------
 PRIORITY = {
     "Tornado Emergency": 100,
     "Tornado Warning": 95,
@@ -26,55 +26,18 @@ PRIORITY = {
     "Severe Thunderstorm Watch": 50
 }
 
-# ---------------- START RTMPS STREAM ----------------
-def start_stream():
-    try:
-        print("🚀 Starting Y’allBot RTMPS stream with silent audio...")
+# ------------------ RTMP PROCESS ------------------
+def start_ffmpeg():
+    process = (
+        ffmpeg
+        .input('pipe:', format='rawvideo', pix_fmt='rgb24', s=f'{WIDTH}x{HEIGHT}', framerate=FPS)
+        .output(f'{RTMP_URL}/{STREAM_KEY}', format='flv', vcodec='libx264', pix_fmt='yuv420p', preset='veryfast')
+        .overwrite_output()
+        .run_async(pipe_stdin=True)
+    )
+    return process
 
-        streamer = (
-            ffmpeg.input(
-                "pipe:", format="rawvideo", pix_fmt="rgb24",
-                s=f"{WIDTH}x{HEIGHT}", framerate=FPS
-            )
-            # Add a silent audio input
-            .input(
-                "anullsrc=channel_layout=stereo:sample_rate=44100",
-                f='lavfi'
-            )
-            .output(
-                YOUTUBE_URL,
-                format="flv",
-                vcodec="libx264",
-                pix_fmt="yuv420p",
-                preset="veryfast",
-                g=FPS*2,
-                b='4500k',          # Video bitrate
-                acodec="aac",       # Audio codec
-                audio_bitrate="128k",
-                ar="44100",
-                ac=2,
-                shortest=None       # Stop stream if any input ends
-            )
-            .overwrite_output()
-            .run_async(pipe_stdin=True, pipe_stderr=True)
-        )
-
-        # Thread to print FFmpeg stderr
-        def log_ffmpeg(proc):
-            for line in iter(proc.stderr.readline, b''):
-                print("FFmpeg:", line.decode(), end='')
-        threading.Thread(target=log_ffmpeg, args=(streamer,), daemon=True).start()
-
-        # Send one black frame to test connection
-        streamer.stdin.write(np.zeros((HEIGHT, WIDTH, 3), dtype=np.uint8).tobytes())
-        print("✅ Connected to YouTube successfully!")
-        return streamer
-
-    except Exception as e:
-        print(f"⚠️ Failed to start stream: {e}")
-        return None
-
-# ---------------- FETCH NOAA ALERTS ----------------
+# ------------------ FETCH NOAA ALERTS ------------------
 def fetch_noaa_alerts():
     try:
         res = requests.get("https://api.weather.gov/alerts/active", timeout=8)
@@ -89,92 +52,71 @@ def fetch_noaa_alerts():
                     "area": props.get("areaDesc", ""),
                     "severity": PRIORITY[event]
                 })
+        # Sort by severity descending
         alerts.sort(key=lambda x: x["severity"], reverse=True)
         return alerts
     except:
         return []
 
-# ---------------- DRAW FRAME WITH MAP ----------------
+# ------------------ DRAW FRAME ------------------
 def draw_frame(alerts, ticker_x):
+    # Black background
     frame = np.zeros((HEIGHT, WIDTH, 3), dtype=np.uint8)
     pil = Image.fromarray(frame)
     draw = ImageDraw.Draw(pil)
 
     # Title bar
-    draw.rectangle((0, 0, WIDTH, 40), fill=(0, 0, 0))
-    draw.text((10, 5), "Y’allBot 24/7 USA Weather Alerts with Map",
-              font=FONT_LARGE, fill=(255, 255, 255))
+    draw.rectangle((0,0,WIDTH,40), fill=(0,0,0))
+    draw.text((10,5), "Y’allBot 24/7 USA Weather Alerts", font=FONT_LARGE, fill=(255,255,255))
 
-    # Top alert box
+    # Top alert box (highest priority)
     if alerts:
         top = alerts[0]
-        fill = (255, 0, 0) if "Tornado" in top["event"] else (255, 140, 0)
-        draw.rectangle((0, 50, WIDTH, 100), fill=fill)
-        draw.text((10, 55), f"{top['event']} — {top['area']}", font=FONT_MED, fill=(0, 0, 0))
+        fill = (255,0,0) if "Tornado" in top["event"] else (255,140,0)
+        draw.rectangle((0,50,WIDTH,100), fill=fill)
+        draw.text((10,55), f"{top['event']} — {top['area']}", font=FONT_MED, fill=(0,0,0))
 
-    # Side panel
-    draw.rectangle((WIDTH-280, 110, WIDTH-10, 270), fill=(20, 20, 20))
-    draw.text((WIDTH-270, 120), "Active Warnings", font=FONT_MED, fill=(255, 255, 255))
-    y = 155
+    # Side panel for other alerts
+    draw.rectangle((WIDTH-280,110,WIDTH-10,270), fill=(20,20,20))
+    draw.text((WIDTH-270,120), "Active Warnings", font=FONT_MED, fill=(255,255,255))
+    y=155
     for a in alerts[:6]:
-        draw.text((WIDTH-270, y), a["event"], font=FONT_SMALL, fill=(255, 0, 0))
+        draw.text((WIDTH-270,y), a["event"], font=FONT_SMALL, fill=(255,0,0))
         y += 24
 
-    # Map display
-    map_x0, map_y0 = 50, 120
-    map_x1, map_y1 = 700, 500
-    draw.rectangle((map_x0, map_y0, map_x1, map_y1), fill=(30, 30, 60))
-    # Example highlights (Oregon/Washington)
-    for a in alerts:
-        if "Oregon" in a["area"]:
-            draw.rectangle((map_x0+50, map_y0+50, map_x0+150, map_y0+150), fill=(255, 0, 0))
-        if "Washington" in a["area"]:
-            draw.rectangle((map_x0+50, map_y0+10, map_x0+150, map_y0+60), fill=(255, 0, 0))
-
-    # Scrolling ticker
+    # Ticker
     crawl = " | ".join([f"{a['event']} - {a['area']}" for a in alerts])
-    draw.rectangle((0, HEIGHT-60, WIDTH, HEIGHT), fill=(0, 0, 0))
-    draw.text((ticker_x, HEIGHT-45), crawl, font=FONT_MED, fill=(255, 0, 0))
+    draw.rectangle((0,HEIGHT-60,WIDTH,HEIGHT), fill=(0,0,0))
+    draw.text((ticker_x, HEIGHT-45), crawl, font=FONT_MED, fill=(255,0,0))
 
     return np.array(pil), len(crawl)*12
 
-# ---------------- MAIN LOOP ----------------
+# ------------------ MAIN LOOP ------------------
 def main():
+    print("🚀 Starting Y’allBot Live Stream")
+    streamer = start_ffmpeg()
     ticker_x = WIDTH
     last_alert = 0
     alerts = []
 
     while True:
-        streamer = start_stream()
-        if streamer is None:
-            print("⏱ Retry in 10 seconds...")
-            time.sleep(10)
-            continue
+        # Update alerts every 30 seconds
+        if time.time() - last_alert > 30:
+            alerts = fetch_noaa_alerts()
+            last_alert = time.time()
+
+        frame, crawl_width = draw_frame(alerts, ticker_x)
+        ticker_x -= 5
+        if ticker_x < -crawl_width:
+            ticker_x = WIDTH
 
         try:
-            frame_id = 0
-            while True:
-                # Update alerts every 30 seconds
-                if time.time() - last_alert > 30:
-                    alerts = fetch_noaa_alerts()
-                    last_alert = time.time()
-
-                frame, crawl_width = draw_frame(alerts, ticker_x)
-                ticker_x -= 5
-                if ticker_x < -crawl_width:
-                    ticker_x = WIDTH
-
-                # Send frame
-                streamer.stdin.write(frame.tobytes())
-                frame_id += 1
-                time.sleep(1 / FPS)
-
+            streamer.stdin.write(frame.tobytes())
         except BrokenPipeError:
-            print("❌ Stream disconnected. Retrying in 10 seconds...")
-            time.sleep(10)
-        except Exception as e:
-            print(f"⚠️ Error during streaming: {e}. Retrying in 10 seconds...")
-            time.sleep(10)
+            print("🔴 Stream disconnected")
+            break
+
+        time.sleep(1.0 / FPS)
 
 if __name__ == "__main__":
-    main()
+    main() add start live stream
