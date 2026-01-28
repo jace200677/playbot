@@ -119,4 +119,4 @@ def main():
         time.sleep(1.0 / FPS)
 
 if __name__ == "__main__":
-    main() add start live stream
+    main()
