@@ -5,84 +5,98 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Y’allBot 24/7 Alerts</title>
 <style>
-  body { margin:0; background:#000; font-family: Arial, sans-serif; }
-  canvas { display:block; margin:0 auto; background:#000; }
+  body { margin: 0; background: #111; color: #fff; font-family: sans-serif; }
+  canvas { display: block; margin: 0 auto; background: #000; }
 </style>
 </head>
 <body>
-<canvas id="yallbotCanvas" width="1280" height="720"></canvas>
-
-<script src="https://cdn.jsdelivr.net/npm/simple-peer/simplepeer.min.js"></script>
+<canvas id="canvas" width="1280" height="720"></canvas>
 
 <script>
-const canvas = document.getElementById("yallbotCanvas");
-const ctx = canvas.getContext("2d");
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
 
-let alerts = [];
-let tickerX = 1280;
+// Connect to your Node.js WebSocket server
+const ws = new WebSocket('ws://localhost:8443'); // change host if remote
 
-// Fetch NOAA alerts every 30s
-async function fetchAlerts(){
-    try {
-        const res = await fetch("https://api.weather.gov/alerts/active");
-        const data = await res.json();
-        alerts = data.features
-            .map(f=>({event:f.properties.event, area:f.properties.areaDesc}))
-            .filter(a=>["Tornado Emergency","Tornado Warning","Severe Thunderstorm Warning","Flash Flood Warning","Tornado Watch","Severe Thunderstorm Watch"].includes(a.event));
-    } catch(e){ console.error(e); }
+ws.onopen = () => {
+  console.log("Connected to Node.js server");
+  requestAnimationFrame(drawAndSend);
+};
+
+// Mock alerts for demonstration
+let alerts = [
+  { event: "Tornado Warning", area: "Oregon" },
+  { event: "Flash Flood Warning", area: "Washington" },
+  { event: "Severe Thunderstorm Watch", area: "California" }
+];
+
+let tickerX = canvas.width;
+
+// Draw frame and send via WebSocket
+function drawAndSend() {
+  // Clear canvas
+  ctx.fillStyle = "#111";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Title bar
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, canvas.width, 40);
+  ctx.fillStyle = "#fff";
+  ctx.font = "30px sans-serif";
+  ctx.fillText("Y’allBot 24/7 USA Weather Alerts", 10, 30);
+
+  // Top alert
+  if (alerts.length) {
+    ctx.fillStyle = alerts[0].event.includes("Tornado") ? "#f00" : "#ff8c00";
+    ctx.fillRect(0, 50, canvas.width, 50);
+    ctx.fillStyle = "#000";
+    ctx.font = "22px sans-serif";
+    ctx.fillText(`${alerts[0].event} — ${alerts[0].area}`, 10, 85);
+  }
+
+  // Side panel
+  ctx.fillStyle = "#222";
+  ctx.fillRect(canvas.width - 280, 110, 270, 160);
+  ctx.fillStyle = "#fff";
+  ctx.font = "22px sans-serif";
+  ctx.fillText("Active Warnings", canvas.width - 270, 135);
+
+  ctx.font = "18px sans-serif";
+  let y = 155;
+  for (let i = 0; i < Math.min(alerts.length, 6); i++) {
+    ctx.fillStyle = "#f00";
+    ctx.fillText(alerts[i].event, canvas.width - 270, y);
+    y += 24;
+  }
+
+  // Map mockup
+  ctx.fillStyle = "#1e1e3c";
+  ctx.fillRect(50, 120, 650, 380);
+  ctx.fillStyle = "#f00";
+  alerts.forEach(a => {
+    if (a.area.includes("Oregon")) ctx.fillRect(100, 150, 100, 100);
+    if (a.area.includes("Washington")) ctx.fillRect(100, 130, 100, 50);
+  });
+
+  // Ticker
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, canvas.height - 60, canvas.width, 60);
+  ctx.fillStyle = "#f00";
+  ctx.font = "22px sans-serif";
+  const crawl = alerts.map(a => `${a.event} - ${a.area}`).join(" | ");
+  ctx.fillText(crawl, tickerX, canvas.height - 30);
+  tickerX -= 5;
+  if (tickerX < -crawl.length * 12) tickerX = canvas.width;
+
+  // Send raw frame to server
+  if (ws.readyState === WebSocket.OPEN) {
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    ws.send(imageData.data.buffer);
+  }
+
+  requestAnimationFrame(drawAndSend);
 }
-fetchAlerts();
-setInterval(fetchAlerts, 30000);
-
-// Draw loop
-function draw(){
-    ctx.fillStyle="#000"; ctx.fillRect(0,0,1280,720);
-
-    // Title
-    ctx.fillStyle="#fff"; ctx.font="30px Arial";
-    ctx.fillText("Y’allBot 24/7 USA Weather Alerts",10,35);
-
-    // Top alert
-    if(alerts.length>0){
-        ctx.fillStyle = alerts[0].event.includes("Tornado")?"#f00":"#f90";
-        ctx.fillRect(0,50,1280,50);
-        ctx.fillStyle="#000"; ctx.font="22px Arial";
-        ctx.fillText(`${alerts[0].event} — ${alerts[0].area}`,10,85);
-    }
-
-    // Side panel
-    ctx.fillStyle="#222"; ctx.fillRect(1000,110,270,160);
-    ctx.fillStyle="#fff"; ctx.font="22px Arial"; ctx.fillText("Active Warnings",1010,140);
-    ctx.font="18px Arial"; let y=170;
-    for(let i=0;i<Math.min(alerts.length,6);i++){
-        ctx.fillStyle="#f00"; ctx.fillText(alerts[i].event,1010,y); y+=24;
-    }
-
-    // Map placeholder
-    ctx.fillStyle="#30303c"; ctx.fillRect(50,120,650,380);
-    alerts.forEach(a=>{
-        if(a.area.includes("Oregon")) { ctx.fillStyle="#f00"; ctx.fillRect(100,170,100,100); }
-        if(a.area.includes("Washington")) { ctx.fillStyle="#f00"; ctx.fillRect(100,130,100,50); }
-    });
-
-    // Ticker
-    let crawl = alerts.map(a=>`${a.event} - ${a.area}`).join(" | ");
-    ctx.fillStyle="#000"; ctx.fillRect(0,660,1280,60);
-    ctx.fillStyle="#f00"; ctx.font="22px Arial";
-    ctx.fillText(crawl,tickerX,695);
-    tickerX-=2; if(tickerX < -crawl.length*12) tickerX=1280;
-
-    requestAnimationFrame(draw);
-}
-draw();
-
-// ----------------- WebRTC Setup -----------------
-const ws = new WebSocket("wss://YOUR_SERVER_DOMAIN:8443"); // your Node.js server
-const stream = canvas.captureStream(5); // 5 FPS
-const peer = new SimplePeer({ initiator:true, trickle:false, stream:stream });
-
-peer.on('signal', data => ws.send(JSON.stringify({ type:'signal', data })));
-ws.onmessage = e => { const msg = JSON.parse(e.data); if(msg.type==='signal') peer.signal(msg.data); };
 </script>
 </body>
 </html>
