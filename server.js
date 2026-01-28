@@ -6,7 +6,7 @@ const wss = new WebSocket.Server({ port: 8443 });
 console.log("WebSocket server running on port 8443");
 
 // Replace with your actual YouTube RTMPS URL
-const YT_URL = "rtmps://a.rtmp.youtube.com/live2/fvgb-pzbe-4j7g-vej0-6g7q";
+const YT_URL = "rtmp://a.rtmp.youtube.com/live2/fvgb-pzbe-4j7g-vej0-6g7q";
 
 wss.on('connection', ws => {
     let ffmpeg = spawn('ffmpeg', [
